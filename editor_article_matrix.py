@@ -445,3 +445,4 @@ if __name__ == "__main__":
     # stats_Data("wiki_dic_editor_splitProcCombineTitleContentLst.json",
                # ['/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-dev.tsv'], 
                # '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-test.tsv')
+test
