@@ -386,6 +386,21 @@ def processSentWiki(str_):
     # 3. process <>, [], {}, [|]
     str_3 = process_modiString(str_2)
 
+
+def select_unbiased205(train_, num_, randomOut_):
+    unbiased = []
+    with open(f, 'r') as a:
+        for line in a:
+            line = line.strip('\n')
+            line = line.split('\t')
+            if line[3] == 'false':
+                unbiased.append(line[9])
+    
+    random.seed(365)
+    out = random.sample(unbiased, num_)
+    with open(randomOut_, 'w') as b:
+        json.dump(out, b)
+
 if __name__ == "__main__":
     # editor_articleNameLst(['/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-dev.tsv'], 'wiki_editor_articleName_dict_4colTrue.json')
     numpy.set_printoptions(threshold=numpy.nan)
@@ -394,10 +409,10 @@ if __name__ == "__main__":
 
     # gen_author_splitTitleArtContent('wiki_editor_articleName_dict_4colTrue.json', 'wiki_editor_articleBeforeForm.json', 'wiki_editor_combineTileContentList.json')
         
-    [author, artLst] = editor_articleMatrixTransformed('wiki_dic_editor_splitProcCombineTitleContentLst.json')
+    # [author, artLst] = editor_articleMatrixTransformed('wiki_dic_editor_splitProcCombineTitleContentLst.json')
     # apply PCA to reduce 10,000 dimen of artLst
-    print len(artLst)
-    print len(artLst[0])
+    # print len(artLst)
+    # print len(artLst[0])
     
     # print y
     # pca = PCA(n_components=10)
@@ -407,24 +422,24 @@ if __name__ == "__main__":
     # Vectorizer results are normalized, which makes KMeans behave as
     # spherical k-means for better results. Since LSA/SVD results are
     # not normalized, we have to redo the normalization.
-    svd = TruncatedSVD(n_components=100)
-    normalizer = Normalizer(copy=False)
-    lsa = make_pipeline(svd, normalizer)
-    artLst1 = lsa.fit_transform(artLst)
+    # svd = TruncatedSVD(n_components=100)
+    # normalizer = Normalizer(copy=False)
+    # lsa = make_pipeline(svd, normalizer)
+    # artLst1 = lsa.fit_transform(artLst)
     
-    print len(artLst1)
-    print len(artLst1[0])
-    y = k_means(artLst1)
+    # print len(artLst1)
+    # print len(artLst1[0])
+    # y = k_means(artLst1)
     # stats of y
-    print Counter(y).keys() # equals to list(set(y))
-    print Counter(y).values() # counts elements' frequency
+    # print Counter(y).keys() # equals to list(set(y))
+    # print Counter(y).values() # counts elements' frequency
     
     # record cluster's content
     # print y
-    auth_clus = []
+    # auth_clus = []
 
-    for i,j in zip(author, y):
-        auth_clus.append([i,int(j)])
+    # for i,j in zip(author, y):
+        # auth_clus.append([i,int(j)])
 
     # print auth_clus
     # with open("wiki_author_communityGroup_20group.json", "w") as c:
@@ -444,4 +459,5 @@ if __name__ == "__main__":
     # groupCluster('wiki_author_communityGroup_20group.json')
     # stats_Data("wiki_dic_editor_splitProcCombineTitleContentLst.json",
                # ['/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-dev.tsv'], 
-               # '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-test.tsv')
+    # '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-test.tsv')
+    select_unbiased205('/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', 205, 'wiki_random205_unbiasedSentColm9.json')
