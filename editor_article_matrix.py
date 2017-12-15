@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # encoding=utf8
 from unidecode import unidecode
-
+import random
 from bs4 import BeautifulSoup
 import re
 from nltk.corpus import stopwords
@@ -127,13 +127,17 @@ def chi2_biasedWord(x_, y_):
     res = chi2(x_,y_)
     return res
 
-def gen_chi2(auth_titleBeforeString_, auth_community_, chi2_):
+def gen_chi2(auth_titleBeforeString_, auth_community_, chi2_, unbiasedLst_):
     '''
-       input: dict of author as key, split and processed title and biased before form as value
+       input: dict of author as key, split and processed title and biased before form as value, we add unbiased sampled sentence as one class.
        output: chi2 weights
     '''
+    with open(unbiasedLst_) as d:
+        unbiasedLst = json.load(d)
+
     with open(auth_titleBeforeString_) as a:
         auth_tb = json.load(a)
+
     with open(auth_community_) as b:
         auth_community = json.load(b)
 
@@ -143,6 +147,11 @@ def gen_chi2(auth_titleBeforeString_, auth_community_, chi2_):
     for key,val in auth_tb.iteritems():
         x.append(' '.join(val))
         lab.append(auth_com[key])
+
+    # add unbiased label as 20
+    x = x + unbiasedLst
+    lab = lab + [20] * len(unbiasedLst)
+    
     vectorizer = TfidfVectorizer(stop_words='english')
     dtm = vectorizer.fit_transform(x)
     vocab = np.array(vectorizer.get_feature_names())
@@ -389,7 +398,7 @@ def processSentWiki(str_):
 
 def select_unbiased205(train_, num_, randomOut_):
     unbiased = []
-    with open(f, 'r') as a:
+    with open(train_, 'r') as a:
         for line in a:
             line = line.strip('\n')
             line = line.split('\t')
@@ -460,4 +469,10 @@ if __name__ == "__main__":
     # stats_Data("wiki_dic_editor_splitProcCombineTitleContentLst.json",
                # ['/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-dev.tsv'], 
     # '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-test.tsv')
-    select_unbiased205('/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', 205, 'wiki_random205_unbiasedSentColm9.json')
+    # select_unbiased205('/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', 205, 'wiki_random205_unbiasedSentColm9.json')
+
+    gen_chi2(
+        'wiki_dic_editor_splitProcCombineTitleContentLst.json', 
+        'wiki_author_communityGroup_20group.json', 
+        'wiki_dict_chi2_biasedWord_20groupWithBiasedGroup.json',
+        "wiki_random205_unbiasedSentColm9.json")
