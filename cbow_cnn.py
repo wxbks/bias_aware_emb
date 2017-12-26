@@ -1,4 +1,6 @@
 #CBOW model version
+from editor_article_matrix import processSentWiki
+import string
 import collections
 import math
 import os
@@ -11,10 +13,32 @@ from six.moves import urllib
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
+# pre-trained model file
+pretrained_filename = 'glove.6B.100d.txt'
+
+def gen_gloveVocab(pretrainModelTxt_):
+    vocab = []
+    embd = []
+    pfile = open(pretrainModelTxt_, 'r')
+    for line in pfile.readlines():
+      row = line.strip().split()
+      vocab.append(row[0])
+      embd.append(row[1:])
+    embeddings = np.asarray(embd)
+    return vocab, embeddings
+
+glove_vocab, gloveEmb = gen_gloveVocab(pretrained_filename)
+print 'glove vocab size:',len(glove_vocab)
+
+
+# enlarge 400000 glove emb to 419999 emb
+# np.random.rand(19999,100)
+
 # filename = '../classWordExtract/processedData/health_tweetId_processedTxt_label_health1Unrelated0.json'
 # filename = '/home/sik211/dusk/SSWE/healthCareExtend/cbowM/cnn-text-classification-tf-master/data/health_related/train_health_processTxtALL.txt'
 # filename = "/home/sik211/dusk/SSWE/healthCareExtend/classWordExtract/processedData/train_relatedVsNotRelated_ALL.txt"
 filename = "wiki_trainEval_aclwrongRightTxtCol1011prepress.txt"
+
 
 # Read the data into a list of strings.
 # def read_data(filename):
@@ -32,21 +56,30 @@ filename = "wiki_trainEval_aclwrongRightTxtCol1011prepress.txt"
       # data = data + t
   # return data
 
+# add pre-process to sents
 def read_data(filename):
   t = list(open(filename, "r").readlines())
   t = [s.strip() for s in t]
   data = []
   for i in t:
-    data = data + i.split()
+    i = processSentWiki(i)
+    isp = i.split()
+    isp = [p.strip(string.punctuation) for p in isp]
+    isp = [p.lower() for p in isp]
+    data = data + isp
   return data
 
-words = read_data(filename)
+# words = read_data(filename)
+# with open('cbow_cnn_words.json','w') as a:
+    # json.dump(words,a)
+with open('cbow_cnn_words.json') as b:
+    words = json.load(b)
 
 # convert words to lower cases
-for item in words:
-    item.lower()
+# for item in words:
+    # item.lower()
         
-print('Data size', len(words))
+print('self Data size', len(words))
 
 # Step 2: Build the dictionary and replace rare words with UNK token.
 def build_dataset(words, min_cut_freq):
@@ -78,12 +111,33 @@ def build_dataset(words, min_cut_freq):
 
 min_cut_freq = 3 #cut off frequence smaller then 3 words
 data, count, dictionary, reverse_dictionary = build_dataset(words, min_cut_freq)
+print "done build dataset"
+# enlarge vocabulary glove_vocab + self_vocab
+self_vocab = reverse_dictionary.keys()
+self_max = max([int(i) for i in self_vocab])
+print 'come here after build_dataset'
+# combine glove vocab to self vocab
+# for w in glove_vocab:
+  # if w not in reverse_dictionary.values():
+      # self_max = self_max + 1
+      # reverse_dictionary[str(self_max)] = w
+
+newwords = set(glove_vocab).difference(set(reverse_dictionary.values()))
+newwords = list(newwords)
+for i in newwords:
+    self_max = self_max + 1
+    reverse_dictionary[self_max] = i
+# enlarge 400000 glove emb to 4xxxxx emb
+extra = len(reverse_dictionary) - len(glove_vocab)
+extra_emb = np.random.rand(extra,100)
+gloveEmb = np.concatenate((gloveEmb,extra_emb), axis=0)
+gloveEmb.astype(float)
 vocabulary_size = len(reverse_dictionary)
 del words  # Hint to reduce memory.
 print('Most common words (+UNK)', count[:5])
 print('Sample data', data[:20], [reverse_dictionary[i] for i in data[:20]])
 print('Vocab size: ', vocabulary_size)
-
+print('gloveEmb with extra shape: ', gloveEmb.shape)
 # load chi2 stats to dict
 # chi2_file = "../classWordExtract/processedData/health_chi2_dict.json"
 # chi2_file = "/home/sik211/dusk/SSWE/healthCareExtend/classWordExtract/processedData/RelatedVsNotRelated20092012_chi2_dict.json"
@@ -136,7 +190,7 @@ def generate_cbow_batch(batch_size, num_skips, skip_window):
 
 # Step 4: Build and train a skip-gram model.
 batch_size = 128
-embedding_size = 128  # Dimension of the embedding vector.
+embedding_size = 100  # Dimension of the embedding vector.
 skip_window = 1       # How many words to consider left and right.
 num_skips = 2         # How many times to reuse an input to generate a label.
 
@@ -159,12 +213,16 @@ with graph.as_default():
   train_labels = tf.placeholder(tf.float32, shape=[batch_size, 1])
   train_chi2 = tf.placeholder(tf.float32, shape=[batch_size, skip_window * 2, 1])
   valid_dataset = tf.constant(valid_examples, dtype=tf.int32)
+  # embedding_placeholder = tf.placeholder(tf.float32, [None, embedding_size], name='wtf')
 
   # Ops and variables pinned to the CPU because of missing GPU implementation
   with tf.device('/cpu:0'):
     # Look up embeddings for inputs
-    embeddings = tf.Variable(
-        tf.random_uniform([vocabulary_size, embedding_size], -1.0, 1.0))
+    # embeddings = tf.Variable(
+        # tf.random_uniform([vocabulary_size, embedding_size], -1.0, 1.0))
+    W = tf.Variable(tf.constant(0.0, shape=[vocabulary_size, embedding_size]), trainable=True, name="W")
+    
+    embeddings = W.assign(gloveEmb)
     # Embedding size is calculated as shape(train_inputs) + shape(embeddings)[1:]
     train_inputs = tf.cast(train_inputs, tf.int32)
     embed = tf.nn.embedding_lookup(embeddings, train_inputs)
@@ -200,7 +258,7 @@ with graph.as_default():
   init = tf.initialize_all_variables()
 
 # Step 5: Begin training.
-num_steps = 100001
+num_steps = 200001
 
 with tf.Session(graph=graph) as session:
   # We must initialize all variables before we use them.
@@ -211,6 +269,13 @@ with tf.Session(graph=graph) as session:
   for step in xrange(num_steps):
     batch_inputs, batch_labels, batch_chi2s = generate_cbow_batch(
         batch_size, num_skips, skip_window)
+    # print gloveEmb.shape
+    # gloveEmb = np.asarray(gloveEmb, np.float32)
+    # gloveEmb = tf.convert_to_tensor(gloveEmb, np.float32)
+    # print tf.shape(gloveEmb)
+    # gloveEmb = gloveEmb.tolist()
+    # gloveEmb = [map(float, i) for i in gloveEmb]
+    # print batch_inputs.shape
     feed_dict = {train_inputs : batch_inputs, train_labels : batch_labels, train_chi2 : batch_chi2s}
 
     # We perform one update step by evaluating the optimizer op (including it
@@ -244,10 +309,12 @@ with tf.Session(graph=graph) as session:
 # with open("health_chi2_weighted_cbowDict_KeyrowNum_ValWord.json", "w") as a:
   # json.dump(reverse_dictionary, a)
 
-np.save("relatedVsNotRelated_chi2_weighted_cbowEmbeddings.npy", final_embeddings)
-with open("relatedVsNotRelated_chi2_weighted_cbowDict_KeyrowNum_ValWord.json", "w") as a:
+# np.save("relatedVsNotRelated_chi2_weighted_cbowEmbeddings.npy", final_embeddings)
+# with open("relatedVsNotRelated_chi2_weighted_cbowDict_KeyrowNum_ValWord.json", "w") as a:
+  # json.dump(reverse_dictionary, a)
+np.save("wiki_trainEval_mixedWrongRight_emb100_glovePre_step200000", final_embeddings)
+with open("wiki_trainEval_mixedWrongRight_emb100_chi2_weighted_cbowDict_KeyrowNumValWord_glove_step200000.json","w") as a:
   json.dump(reverse_dictionary, a)
-
 
 tsne_plot = False # Change the false to true to invoke the tsne graph
 
@@ -266,7 +333,7 @@ def plot_with_labels(low_dim_embs, labels, filename='tsne_CBOW.png'):
                  va='bottom')
 
   plt.savefig(filename)
-
+  
 try:
   from sklearn.manifold import TSNE
   import matplotlib.pyplot as plt
@@ -299,3 +366,4 @@ print nearest
 for k in xrange(top_k+1):
     close_word = reverse_dictionary[nearest[k]]
     print(close_word)
+
