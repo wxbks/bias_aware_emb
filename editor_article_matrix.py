@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # encoding=utf8
+import nltk
+from random import shuffle
 from unidecode import unidecode
 import random
 from bs4 import BeautifulSoup
@@ -388,13 +390,19 @@ def process_modiString(str_):
     return s2
         
 def processSentWiki(str_):
+    str_ = str_.decode('utf8')
     # 1. remove html link in str_
     str_1  = re.sub('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', str_)
+    # print 'str_1:', str_1
     # 2. remove html tags
-    str_2 = BeautifulSoup(str_1).text
+    str_2 = BeautifulSoup(str_1)
+    str_2 = str_2.get_text()
+    # str_2 = nltk.clean_html(str_1)
+    # print 'str_2:', str_2
     # 3. process <>, [], {}, [|]
     str_3 = process_modiString(str_2)
-
+    # print 'str_3:', str_3
+    return str_3
 
 def select_unbiased205(train_, num_, randomOut_):
     unbiased = []
@@ -409,6 +417,61 @@ def select_unbiased205(train_, num_, randomOut_):
     out = random.sample(unbiased, num_)
     with open(randomOut_, 'w') as b:
         json.dump(out, b)
+
+def gen_cbow_txtfiles(trainEvalLst_, wrongTxtCol10_, rightTxtCol11_, wrongRightTxtCol1011_):
+    wrongTxtLst = []
+    rightTxtLst = []
+    mixedTxtLst = []
+    for f in trainEvalLst_:
+        with open(f, 'r')  as a:
+            for line in a:
+                line = line.strip('\n')
+                line = line.split('\t')
+                if line[3] == 'true':
+                    # preprocess line[10] and line[11]
+                    # print line
+                    print 'before:',line[8]
+                    l8 = processSentWiki(line[8])
+                    print 'after:',l8
+                    l9 = processSentWiki(line[9])
+                    wrongTxtLst.append(l8)
+                    rightTxtLst.append(l9)
+                    mixedTxtLst.append(l8)
+                    mixedTxtLst.append(l9)
+    shuffle(mixedTxtLst)
+    shuffle(wrongTxtLst)
+    shuffle(rightTxtLst)
+    with open(wrongTxtCol10_, 'w') as b:
+        json.dump(wrongTxtLst,b)
+    with open(rightTxtCol11_, 'w') as c:
+        json.dump(rightTxtLst,c)
+    with open(wrongRightTxtCol1011_, 'w') as d:
+        json.dump(mixedTxtLst,d)
+
+
+def json2txt(json_, txt_):
+    with open(json_) as a:
+        j = json.load(a)
+    f = open(txt_,'w')
+    for i in j:
+        i = i.encode('utf8')
+        f.write(i+'\n')
+    f.close()
+
+def gloveVocab_selfVocabDiff(gloveFile_, selfVocab_):
+    glove_vocab = []
+    self_vocab = []
+    g = open(gloveFile_, 'r')
+    for line in g.readlines():
+        row = line.strip().split()
+        glove_vocab.append(row[0])
+    with open(selfVocab_) as a:
+        f = json.load(a)
+    self_vocab = f.values()
+    print('glove vocab size:', len(glove_vocab))
+    print('self vocab size:', len(self_vocab))
+    diffSet = set(self_vocab).difference(set(glove_vocab))
+    print('diff size:', len(list(diffSet)))
 
 if __name__ == "__main__":
     # editor_articleNameLst(['/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-dev.tsv'], 'wiki_editor_articleName_dict_4colTrue.json')
@@ -471,8 +534,19 @@ if __name__ == "__main__":
     # '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-test.tsv')
     # select_unbiased205('/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', 205, 'wiki_random205_unbiasedSentColm9.json')
 
-    gen_chi2(
-        'wiki_dic_editor_splitProcCombineTitleContentLst.json', 
-        'wiki_author_communityGroup_20group.json', 
-        'wiki_dict_chi2_biasedWord_20groupWithBiasedGroup.json',
-        "wiki_random205_unbiasedSentColm9.json")
+    # gen_chi2(
+        # 'wiki_dic_editor_splitProcCombineTitleContentLst.json', 
+        # 'wiki_author_communityGroup_20group.json', 
+        # 'wiki_dict_chi2_biasedWord_20groupWithBiasedGroup.json',
+        # "wiki_random205_unbiasedSentColm9.json")
+    # gen_cbow_txtfiles(['/home/sik211/dusk/npov_data/npov-edits/5gram-edits-train.tsv', '/home/sik211/dusk/npov_data/npov-edits/5gram-edits-dev.tsv'], 
+                      # 'wiki_trainEval_aclwrongTxtCol10prepres.json', 
+                      # 'wiki_trainEval_aclrightTxtCol11prepres.json',
+                      # 'wiki_trainEval_aclwrongRightTxtCol1011prepress.json')
+    # q = "Shortly after taking office, President Sarkozy began negotiations with [[Colombia]]n president [[Álvaro Uribe]] and the left-wing guerrilla [[FARC]], regarding the release of hostages held by the rebel group, especially Franco-Colombian politician [[Ingrid Betancourt]]."
+    # l=processSentWiki(q)
+    # print 'before:',q
+    # print 'after:',l
+    
+    # json2txt('wiki_trainEval_aclwrongRightTxtCol1011prepress.json', 'wiki_trainEval_aclwrongRightTxtCol1011prepress.txt')
+    # gloveVocab_selfVocabDiff('glove.6B.100d.txt', 'wiki_trainEval_mixedWrongRight_emb128_chi2_weighted_cbowDict_KeyrowNumValWord.json')
